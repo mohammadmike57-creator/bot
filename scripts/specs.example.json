@@ -1,0 +1,9 @@
+{
+  "_comment": "EXAMPLE VALUES ONLY - copy the real numbers for YOUR broker from the dashboard (Symbols) or MT5 (Symbol > Specification). Remove this key.",
+  "XAUUSD": {"digits": 2, "point": 0.01, "tick_size": 0.01, "tick_value": 1.0, "contract_size": 100,
+             "volume_min": 0.01, "volume_max": 50, "volume_step": 0.01, "stops_level": 0, "margin_per_lot": 0},
+  "OIL":    {"digits": 2, "point": 0.01, "tick_size": 0.01, "tick_value": 1.0, "contract_size": 100,
+             "volume_min": 0.01, "volume_max": 50, "volume_step": 0.01, "stops_level": 0, "margin_per_lot": 0},
+  "US30":   {"digits": 1, "point": 0.1, "tick_size": 0.1, "tick_value": 0.1, "contract_size": 1,
+             "volume_min": 0.1, "volume_max": 100, "volume_step": 0.1, "stops_level": 0, "margin_per_lot": 0}
+}

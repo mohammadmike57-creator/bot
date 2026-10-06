@@ -1,0 +1,12 @@
+.git
+.env
+**/__pycache__
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+dashboard/node_modules
+dashboard/dist
+data/*
+models/*
+reports/*
+*.db

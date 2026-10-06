@@ -1,0 +1,38 @@
+# Local development stack: API + PostgreSQL (+ optional Redis).
+#   cp .env.example .env   # fill in secrets
+#   docker compose up --build
+#   docker compose --profile redis up --build   # with Redis
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: trading
+      POSTGRES_PASSWORD: localdev        # local only; Render provides its own credentials
+      POSTGRES_DB: trading
+    ports: ["5432:5432"]
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trading"]
+      interval: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    profiles: ["redis"]
+    ports: ["6379:6379"]
+
+  api:
+    build: .
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://trading:localdev@postgres:5432/trading
+      MODELS_DIR: /app/models
+      PORT: "8000"
+    ports: ["8000:8000"]
+    volumes: ["./models:/app/models", "./data:/app/data:ro"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:

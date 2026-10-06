@@ -1,0 +1,83 @@
+# Render Blueprint: backend API + PostgreSQL + static dashboard.
+# Secrets marked `sync: false` must be entered in the Render dashboard - never committed.
+# Safety defaults (PAPER, live disabled) are set explicitly here.
+databases:
+  - name: trading-db
+    plan: basic-256mb
+    databaseName: trading
+    user: trading
+
+services:
+  - type: web
+    name: trading-ai-api
+    runtime: python
+    rootDir: server
+    plan: starter            # free instances sleep when idle - unsuitable for 24/5 operation
+    buildCommand: pip install -r requirements.txt
+    preDeployCommand: alembic upgrade head
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips='*'
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: ENVIRONMENT
+        value: production
+      - key: TRADING_MODE
+        value: PAPER
+      - key: ENABLE_LIVE_TRADING
+        value: "false"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: trading-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: EA_HMAC_SECRET
+        generateValue: true
+      - key: API_KEY
+        generateValue: true
+      - key: EA_API_KEY_ID
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false          # e.g. https://trading-ai-dashboard.onrender.com
+      - key: XAUUSD_SYMBOL
+        sync: false
+      - key: OIL_SYMBOL
+        sync: false
+      - key: US30_SYMBOL
+        sync: false
+      - key: NEWS_PROVIDER
+        sync: false
+      - key: NEWS_API_KEY
+        sync: false
+      - key: MODELS_DIR
+        value: /var/data/models
+      - key: MAX_DAILY_LOSS
+        value: "0.02"
+      - key: MAX_DRAWDOWN
+        value: "0.08"
+      - key: MAX_PORTFOLIO_RISK
+        value: "0.03"
+      - key: MAX_POSITIONS
+        value: "8"
+    disk:                    # persistent storage for trained model artifacts
+      name: models
+      mountPath: /var/data
+      sizeGB: 1
+
+  - type: web
+    name: trading-ai-dashboard
+    runtime: static
+    rootDir: dashboard
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_API_URL
+        sync: false          # e.g. https://trading-ai-api.onrender.com
+    headers:
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff

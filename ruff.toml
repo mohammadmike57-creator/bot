@@ -1,0 +1,2 @@
+# Lint the whole repository with the backend's settings: `ruff check .`
+extend = "server/pyproject.toml"
