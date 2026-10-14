@@ -44,6 +44,7 @@ function Controls({ status, onChange }: { status: Status; onChange: () => void }
       <div className="toolbar">
         <button className="btn" onClick={() => reset(["daily_loss"], "daily risk")}>RESET DAILY RISK</button>
         <button className="btn" onClick={() => reset(["drawdown"], "drawdown lock")}>RESET DRAWDOWN LOCK</button>
+        <button className="btn" onClick={() => reset(["loss_streak"], "loss streak")}>RESET LOSS STREAK</button>
         <button className="btn" disabled={!c?.kill_switch} onClick={() => reset(["kill_switch"], "kill switch")}>RESET KILL SWITCH</button>
         <button className="btn" disabled={!c?.safe_mode} onClick={() => reset(["safe_mode"], "safe mode")}>CLEAR SAFE MODE</button>
       </div>
@@ -98,6 +99,11 @@ export function Overview({ source }: { source: Source }) {
         <Tile label="Average loss" value={fmtMoney(p?.avg_loss)} />
         <Tile label="Expectancy" value={fmtMoney(p?.expectancy)} sub={`avg ${fmtNum(p?.avg_r)} R`} />
         <Tile label="Trades today" value={s?.trades_today ?? "—"} />
+        <Tile
+          label="Losing streak"
+          value={acc ? `${acc.consecutive_losses} in a row` : "—"}
+          sub={acc?.cooldown_until ? `PAUSED until ${new Date(acc.cooldown_until).toLocaleTimeString()}` : acc && acc.consecutive_losses >= 2 ? "reduced size until a winner" : "normal size"}
+        />
       </div>
 
       {s && (

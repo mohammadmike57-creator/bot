@@ -38,6 +38,7 @@ class AlertType(str, Enum):
     MODEL_FAILURE = "MODEL_FAILURE"
     SAFE_MODE = "SAFE_MODE"
     SLIPPAGE_ABNORMAL = "SLIPPAGE_ABNORMAL"
+    LOSS_STREAK_COOLDOWN = "LOSS_STREAK_COOLDOWN"
 
 
 class Severity(str, Enum):

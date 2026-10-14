@@ -10,11 +10,12 @@ from __future__ import annotations
 import math
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from datetime import datetime
 
 from app.domain import AccountState, HedgePurpose, OpenPosition, SymbolSpec, TradeProposal
 from app.risk.correlation import correlated_risk
-from app.risk.drawdown import EquityRiskState
-from app.risk.exposure import position_risk_money
+from app.risk.drawdown import EquityRiskState, in_cooldown, loss_streak_scale
+from app.risk.exposure import giveback_to_stop, position_risk_money
 from app.risk.limits import RiskLimits
 from app.risk.margin import max_volume_for_margin, projected_margin_usage
 from app.risk.position_sizing import calculate_position_size
@@ -103,6 +104,7 @@ class RiskEngine:
         specs: dict[str, SymbolSpec],
         equity_state: EquityRiskState,
         flags: ControlFlags = ControlFlags(),
+        now: datetime | None = None,
     ) -> RiskDecision:
         L = self.limits
         checks: list[CheckResult] = []
@@ -160,6 +162,10 @@ class RiskEngine:
         if equity_state.daily_loss_locked or daily >= L.max_daily_loss:
             return reject("daily_loss", "MAX_DAILY_LOSS_REACHED")
         ok("drawdown_daily")
+        metrics["loss_streak"] = float(equity_state.consecutive_losses)
+        if in_cooldown(equity_state, now):
+            return reject("loss_streak", f"LOSS_STREAK_COOLDOWN until {equity_state.cooldown_until:%H:%M} UTC")
+        streak_scale = loss_streak_scale(equity_state, L.loss_streak)
 
         # 5. stop loss / take profit validity --------------------------------
         sl_problem = self._validate_stops(proposal, spec)
@@ -185,9 +191,9 @@ class RiskEngine:
 
         # 8. risk budget (equity scaling, bounded) ---------------------------
         mult = risk_multiplier(account.equity, equity_state.initial_equity, self.scaling_steps, L, dd)
-        risk_fraction = L.risk_per_trade * mult * proposal.risk_scale
+        risk_fraction = L.risk_per_trade * mult * proposal.risk_scale * streak_scale
         risk_fraction = min(risk_fraction, L.max_symbol_risk)
-        metrics.update(risk_multiplier=mult, risk_fraction=risk_fraction)
+        metrics.update(risk_multiplier=mult, risk_fraction=risk_fraction, streak_scale=streak_scale)
 
         risks = self.open_risk(own, specs)
         if any(math.isinf(r) for _, r in risks):
@@ -203,14 +209,17 @@ class RiskEngine:
         )
 
         day_base = equity_state.day_start_equity if equity_state.day_start_equity > 0 else equity
+        # Worst case if every open stop is hit (includes giving back floating profit).
+        giveback = sum(giveback_to_stop(p, specs[p.symbol]) for p, _ in risks if p.symbol in specs)
+        worst_equity = equity - giveback
         # Remaining budgets bound the new trade's risk money.
         budgets = {
             "trade": risk_fraction * equity,
             "symbol": L.max_symbol_risk * equity - symbol_risk,
             "strategy": L.max_strategy_risk * equity - strategy_risk,
             "portfolio": L.max_portfolio_risk * equity - portfolio_risk,
-            # Never put on more open risk than the daily loss allowance left.
-            "daily": L.max_daily_loss * day_base - max(0.0, day_base - equity) - portfolio_risk,
+            # Even if every stop (old and new) is hit, equity must stay above the daily floor.
+            "daily": worst_equity - day_base * (1 - L.max_daily_loss),
         }
         corr_risk = correlated_risk(
             proposal.symbol,

@@ -349,6 +349,8 @@ class RiskState(Base):
     last_equity: Mapped[float] = mapped_column(Float, default=0.0)
     daily_loss_locked: Mapped[bool] = mapped_column(Boolean, default=False)
     drawdown_locked: Mapped[bool] = mapped_column(Boolean, default=False)
+    consecutive_losses: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    cooldown_until: Mapped[datetime | None] = mapped_column(nullable=True)
     kill_switch: Mapped[bool] = mapped_column(Boolean, default=False)
     kill_reason: Mapped[str] = mapped_column(String(255), default="")
     kill_at: Mapped[datetime | None] = mapped_column(nullable=True)

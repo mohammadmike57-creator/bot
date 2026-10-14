@@ -16,10 +16,18 @@ overridden by the backend. Strategies and the ML model can only **reduce** risk.
 | `MAX_PORTFOLIO_RISK` | 3% | open risk of all positions |
 | `MAX_CORRELATED_EXPOSURE` | 2% | open risk moving together (|ρ| ≥ `CORRELATION_THRESHOLD` in the held direction) |
 | `MAX_MARGIN_USAGE` | 40% | margin used / equity after the trade |
-| `MAX_POSITIONS` / per symbol | 8 / 3 | secondary limits only |
+| `MAX_POSITIONS` / per symbol | 15 / 5 | secondary limits only |
+| `LOSS_STREAK_REDUCE_AFTER` / `LOSS_STREAK_RISK_SCALE` | 2 / 0.5 | after 2 losers in a row, half size until a winner |
+| `LOSS_STREAK_COOLDOWN_AFTER` / `..._MINUTES` | 3 / 120 | after 3 losers in a row, no new trades for 2 h |
 
-"Open risk" of a position = money lost if its stop is hit **from the current price**; a stop already in
-profit contributes 0. A position without a stop blocks all new risk.
+**Capital at risk** of a position = money lost versus its cost basis if the stop is hit, measured from
+the *worse* of entry and current price. A trade whose stop has moved to break-even or better risks 0,
+so it frees budget for new trades — this is how the bot can hold many positions while the money at
+risk stays capped. A position without a stop blocks all new risk.
+
+The **daily-loss floor** uses the worst case instead: if every open stop *and* the new one were hit
+(including giving back floating profit), equity must stay above day-start equity × (1 − 2%). With the
+defaults this binds before the 3% portfolio cap.
 
 The new trade's risk money is the *minimum* of: per-trade budget, remaining symbol / strategy /
 portfolio / correlated budgets and the remaining daily-loss allowance minus existing open risk. So a
@@ -58,6 +66,20 @@ forced to 0.75. Scaling never increases risk to recover losses.
   - a stop only ever moves in the protective direction; candidates closer than the broker's stop/freeze
     level are skipped; the most protective valid one is used.
   - EA only: an own position without a stop gets an emergency stop (`InpEmergencySlAtr`×ATR) or is closed.
+
+## Losing streaks
+
+Professional desks cut size when they are wrong and step away after a run of losses. Closed trades
+update a persisted streak counter (backend `risk_state`; it survives restarts):
+
+- after `LOSS_STREAK_REDUCE_AFTER` consecutive losers, new trades use `LOSS_STREAK_RISK_SCALE` × the
+  normal risk until a winner resets the streak;
+- after `LOSS_STREAK_COOLDOWN_AFTER` consecutive losers, no new trades for
+  `LOSS_STREAK_COOLDOWN_MINUTES` (and again after every further block of losers);
+- risk is never increased after a loss. Manual reset: dashboard *RESET LOSS STREAK*.
+
+The streak is enforced by the backend (the EA asks the backend for every entry, and without the
+backend it opens nothing).
 
 ## Hedging
 

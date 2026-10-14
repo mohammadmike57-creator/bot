@@ -176,7 +176,7 @@ public:
       if(newRisk / equity * 100.0 > InpMaxRiskPerTradePct * 1.0001)
          return "TRADE_RISK_ABOVE_LIMIT";
       // 9. portfolio limits & margin
-      if(!m_portfolio.Allows(m_positions, broker, isBuy, newRisk, reason))
+      if(!m_portfolio.Allows(m_positions, broker, isBuy, newRisk, m_risk.DayStartEquity(), reason))
          return reason;
       if(!CPortfolioManager::MarginAllows(broker, isBuy, volume, price, reason))
          return reason;

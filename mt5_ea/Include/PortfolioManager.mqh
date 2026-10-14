@@ -12,7 +12,9 @@ class CPortfolioManager
   {
 public:
    // Can a new position with ``newRisk`` money at risk on ``symbol`` be added?
-   bool Allows(CPositionManager *pm, const string symbol, const bool isBuy, const double newRisk, string &reason)
+   // ``dayStartEquity``: equity at the trading-day start (for the daily-loss floor).
+   bool Allows(CPositionManager *pm, const string symbol, const bool isBuy, const double newRisk,
+               const double dayStartEquity, string &reason)
      {
       double equity = AccountInfoDouble(ACCOUNT_EQUITY);
       if(equity <= 0)
@@ -27,7 +29,7 @@ public:
          reason = "MAX_POSITIONS_REACHED";
          return false;
         }
-      double total = 0, sym = 0;
+      double total = 0, sym = 0, giveback = 0;
       int symCount = 0;
       for(int i = 0; i < n; i++)
         {
@@ -37,6 +39,7 @@ public:
             return false;
            }
          total += pos[i].riskMoney;
+         giveback += pos[i].giveback;
          if(pos[i].symbol == symbol)
            {
             sym += pos[i].riskMoney;
@@ -56,6 +59,12 @@ public:
       if((sym + newRisk) / equity * 100.0 > InpMaxSymbolRiskPct + 1e-9)
         {
          reason = "MAX_SYMBOL_RISK_REACHED";
+         return false;
+        }
+      // Even if every stop (old and new) is hit, equity must stay above the daily-loss floor.
+      if(dayStartEquity > 0 && equity - giveback - newRisk < dayStartEquity * (1.0 - InpMaxDailyLossPct / 100.0))
+        {
+         reason = "MAX_DAILY_RISK_REACHED";
          return false;
         }
       return true;

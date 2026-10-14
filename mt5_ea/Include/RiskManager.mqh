@@ -116,6 +116,7 @@ public:
    bool   DailyLocked()  const { return m_dailyLocked; }
    bool   DrawdownLocked() const { return m_ddLocked; }
    double DailyLossPct() const { return m_dailyLossPct; }
+   double DayStartEquity() const { return m_dayStartEquity; }
    double DrawdownPct()  const { return m_drawdownPct; }
 
    bool CanOpenNew(string &reason)

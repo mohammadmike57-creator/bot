@@ -20,6 +20,49 @@ class EquityRiskState:
     last_equity: float = 0.0
     daily_loss_locked: bool = False
     drawdown_locked: bool = False
+    consecutive_losses: int = 0
+    cooldown_until: datetime | None = None
+
+
+@dataclass(frozen=True)
+class LossStreakPolicy:
+    """How a professional desk reacts to a losing streak: trade smaller, then step away.
+
+    Risk is only ever REDUCED after losses (never increased to "win it back").
+    """
+
+    reduce_after: int = 2  # consecutive losing trades before risk is reduced
+    reduced_scale: float = 0.5  # risk multiplier while the streak lasts (until the next winner)
+    cooldown_after: int = 3  # consecutive losses that pause new trades
+    cooldown_minutes: int = 120
+
+
+def record_trade_result(state: EquityRiskState, profit: float, now: datetime, policy: LossStreakPolicy) -> bool:
+    """Update the streak with one closed trade. Returns True when a cooldown starts.
+
+    A winner resets the streak; a scratch (exactly 0) leaves it unchanged.
+    """
+    if profit > 0:
+        state.consecutive_losses = 0
+        return False
+    if profit == 0:
+        return False
+    state.consecutive_losses += 1
+    n, every = state.consecutive_losses, policy.cooldown_after
+    if every > 0 and n >= every and (n - every) % every == 0:
+        state.cooldown_until = now + timedelta(minutes=policy.cooldown_minutes)
+        return True
+    return False
+
+
+def loss_streak_scale(state: EquityRiskState, policy: LossStreakPolicy) -> float:
+    if policy.reduce_after > 0 and state.consecutive_losses >= policy.reduce_after:
+        return policy.reduced_scale
+    return 1.0
+
+
+def in_cooldown(state: EquityRiskState, now: datetime | None) -> bool:
+    return bool(now is not None and state.cooldown_until is not None and now < state.cooldown_until)
 
 
 @dataclass(frozen=True)
@@ -93,3 +136,8 @@ def reset_drawdown(state: EquityRiskState, equity: float) -> None:
 def reset_daily(state: EquityRiskState, equity: float) -> None:
     state.day_start_equity = equity
     state.daily_loss_locked = False
+
+
+def reset_loss_streak(state: EquityRiskState) -> None:
+    state.consecutive_losses = 0
+    state.cooldown_until = None

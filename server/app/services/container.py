@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import threading
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from typing import Any
 
 from app.ai.features import FeatureCache
@@ -119,8 +119,7 @@ class Container:
     def _apply_overrides(self) -> None:
         base = RiskLimits.from_settings(self.settings)
         o = self.overrides
-        self.limits = RiskLimits(**{
-            **base.__dict__,
+        self.limits = replace(base, **{
             "risk_per_trade": min(base.risk_per_trade, o.get("risk_per_trade", base.risk_per_trade)),
             "max_positions": min(base.max_positions, o.get("max_positions", base.max_positions)),
             "max_portfolio_risk": min(base.max_portfolio_risk, o.get("max_portfolio_risk", base.max_portfolio_risk)),
@@ -148,6 +147,6 @@ class Container:
         data["effective_trading_mode"] = s.effective_trading_mode.value
         data["live_trading_permitted"] = s.live_trading_permitted
         data["symbol_map"] = s.symbol_map()
-        data["effective_limits"] = self.limits.__dict__
+        data["effective_limits"] = asdict(self.limits)
         data["runtime_overrides"] = self.overrides.values
         return data

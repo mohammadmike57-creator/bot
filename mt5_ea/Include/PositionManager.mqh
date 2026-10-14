@@ -25,7 +25,8 @@ struct PmxPosition
    double   swap;
    datetime opened;
    string   comment;
-   double   riskMoney;   // money lost if SL is hit from the current price
+   double   riskMoney;   // CAPITAL at risk: from the worse of entry/current to SL (0 at break-even+)
+   double   giveback;    // equity lost if SL is hit from the current price (incl. floating profit)
   };
 
 class CPositionManager
@@ -78,16 +79,18 @@ public:
       p.swap    = PositionGetDouble(POSITION_SWAP);
       p.opened  = (datetime)PositionGetInteger(POSITION_TIME);
       p.comment = PositionGetString(POSITION_COMMENT);
-      p.riskMoney = 0;
-      if(p.sl <= 0)
-         p.riskMoney = -1;  // unknown / unbounded
-      else
+      p.riskMoney = -1;  // unknown / unbounded until computed
+      p.giveback = -1;
+      if(p.sl > 0)
         {
-         double loss = 0;
-         if(CRiskManager::LossMoney(p.symbol, p.isBuy, p.volume, p.current, p.sl, loss))
-            p.riskMoney = loss;
-         else
-            p.riskMoney = -1;
+         double worse = p.isBuy ? MathMin(p.entry, p.current) : MathMax(p.entry, p.current);
+         double capital = 0, give = 0;
+         if(CRiskManager::LossMoney(p.symbol, p.isBuy, p.volume, worse, p.sl, capital) &&
+            CRiskManager::LossMoney(p.symbol, p.isBuy, p.volume, p.current, p.sl, give))
+           {
+            p.riskMoney = capital;
+            p.giveback = give;
+           }
         }
       return true;
      }

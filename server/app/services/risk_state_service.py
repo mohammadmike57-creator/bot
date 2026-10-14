@@ -10,12 +10,21 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 
+from sqlalchemy.orm import Session
+
 from app.config.settings import EmergencyClosePolicy, Settings
 from app.database import repositories as repo
 from app.database.database import Database
 from app.database.models import RiskState, utcnow
 from app.monitoring.alerts import Alert, AlertType, Notifier, Severity
-from app.risk.drawdown import EquityCheck, EquityRiskState, update_equity_state
+from app.risk.drawdown import (
+    EquityCheck,
+    EquityRiskState,
+    LossStreakPolicy,
+    record_trade_result,
+    reset_loss_streak,
+    update_equity_state,
+)
 from app.risk.risk_engine import ControlFlags
 
 GLOBAL = "GLOBAL"
@@ -36,14 +45,37 @@ class ControlState:
 
 def _to_equity_state(r: RiskState) -> EquityRiskState:
     return EquityRiskState(r.trading_day, r.day_start_equity, r.initial_equity, r.peak_equity, r.last_equity,
-                           r.daily_loss_locked, r.drawdown_locked)
+                           r.daily_loss_locked, r.drawdown_locked, r.consecutive_losses or 0, r.cooldown_until)
 
 
 def _apply(r: RiskState, e: EquityRiskState) -> None:
     r.trading_day, r.day_start_equity, r.initial_equity = e.trading_day, e.day_start_equity, e.initial_equity
     r.peak_equity, r.last_equity = e.peak_equity, e.last_equity
     r.daily_loss_locked, r.drawdown_locked = e.daily_loss_locked, e.drawdown_locked
+    r.consecutive_losses, r.cooldown_until = e.consecutive_losses, e.cooldown_until
     r.updated_at = utcnow()
+
+
+def apply_trade_result(s: Session, login: str, profit: float, now: datetime, policy: LossStreakPolicy) -> bool:
+    """Record a closed trade in the persisted loss streak (inside the caller's session).
+
+    Returns True if a cooldown started (the caller should alert).
+    """
+    row = repo.get_risk_state(s, login)
+    state = _to_equity_state(row)
+    started = record_trade_result(state, profit, now, policy)
+    _apply(row, state)
+    if started:
+        repo.add_risk_event(s, "LOSS_STREAK_COOLDOWN",
+                            f"{state.consecutive_losses} consecutive losses - new trades paused until "
+                            f"{state.cooldown_until:%Y-%m-%d %H:%M} UTC", "WARNING", login)
+    return started
+
+
+def cooldown_alert(login: str, minutes: int) -> Alert:
+    return Alert(AlertType.LOSS_STREAK_COOLDOWN,
+                 f"{login}: losing streak - new trades paused for {minutes} min, then reduced risk until a winner",
+                 Severity.WARNING)
 
 
 class RiskStateService:
@@ -150,6 +182,10 @@ class RiskStateService:
                 if "drawdown" in items:
                     row.drawdown_locked = False
                     row.peak_equity = equity
+                if "loss_streak" in items:
+                    st = _to_equity_state(row)
+                    reset_loss_streak(st)
+                    _apply(row, st)
             repo.add_risk_event(s, "MANUAL_RESET", ",".join(items), "WARNING", details={"actor": actor, "note": note})
             repo.add_system_event(s, "risk", "MANUAL_RESET", f"{actor}: {','.join(items)} {note}", "WARNING")
         return self.controls()

@@ -44,6 +44,9 @@ def system_status(c: Container, now: datetime) -> dict[str, Any]:
                     "total_pnl": round(acc.equity - risk.initial_equity, 2) if risk.initial_equity else 0.0,
                     "drawdown": round((risk.peak_equity - acc.equity) / risk.peak_equity, 4) if risk.peak_equity else 0.0,
                     "daily_loss_locked": risk.daily_loss_locked, "drawdown_locked": risk.drawdown_locked,
+                    "consecutive_losses": risk.consecutive_losses or 0,
+                    "cooldown_until": risk.cooldown_until.isoformat()
+                    if risk.cooldown_until and risk.cooldown_until > now else None,
                 }
                 if label == "mt5":
                     mt5_account = data

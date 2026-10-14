@@ -15,6 +15,7 @@ from app.monitoring.alerts import Alert, AlertType, Severity
 from app.portfolio.portfolio_manager import spec_from_record
 from app.risk.drawdown import trading_day_for
 from app.services.container import Container
+from app.services.risk_state_service import apply_trade_result, cooldown_alert
 from app.sessions.timezone import ensure_utc
 
 
@@ -201,6 +202,8 @@ class IngestService:
                     day = trading_day_for(_ts(ev.time), c.settings.trading_day_timezone,
                                           c.settings.trading_day_rollover_hour)
                     repo.upsert_performance_day(s, ev.account_login, "MT5", day, row.realized_profit)
+                    if apply_trade_result(s, ev.account_login, row.realized_profit, now, c.limits.loss_streak):
+                        c.notifier.notify(cooldown_alert(ev.account_login, c.limits.loss_streak.cooldown_minutes))
                     if row.r_multiple is not None and sig is not None and sig.model_version not in ("", "rule-based"):
                         c.inference.health.record_trade_result(row.r_multiple)
                 else:

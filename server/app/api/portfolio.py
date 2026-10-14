@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import asdict
 from typing import Any
 
 from fastapi import APIRouter, Depends, Query
@@ -33,7 +34,7 @@ def portfolio(source: str = Query("PAPER", pattern="^(MT5|PAPER)$"), c: Containe
         "net_notional": {k: round(v, 2) for k, v in exp.net_notional.items()},
         "hedged_symbols": exp.hedged_symbols,
         "positions_without_stop": exp.positions_without_stop,
-        "limits": c.limits.__dict__,
+        "limits": asdict(c.limits),
         "correlation": c.correlation.matrix(symbols),
         "margin_usage": round(snap.account.margin / eq, 4) if eq > 0 else None,
     }

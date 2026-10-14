@@ -58,8 +58,8 @@ input double InpMaxDrawdownPct       = 8.0;   // Max drawdown from peak (%)
 input double InpMaxPortfolioRiskPct  = 3.0;   // Max open risk, all positions (% equity)
 input double InpMaxSymbolRiskPct     = 1.5;   // Max open risk per symbol (% equity)
 input double InpMaxMarginUsagePct    = 40.0;  // Max margin usage (% equity)
-input int    InpMaxPositions         = 8;     // Max own open positions (secondary limit)
-input int    InpMaxPositionsPerSymbol= 3;     // Max own positions per symbol
+input int    InpMaxPositions         = 15;    // Max own open positions (secondary limit; open RISK is the real cap)
+input int    InpMaxPositionsPerSymbol= 5;     // Max own positions per symbol
 input int    InpMaxSpreadPoints      = 0;     // Max spread in points (0 = ATR ratio only)
 input double InpMaxSpreadAtrRatio    = 0.15;  // Max spread / ATR
 input int    InpMaxDeviationPoints   = 30;    // Max slippage accepted by the broker (points)

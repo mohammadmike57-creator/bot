@@ -6,6 +6,7 @@ import pandas as pd
 import pytest
 
 from app.api import account as account_api
+from app.api import health as health_api
 from app.api import signals as signals_api
 from app.api import trades as trades_api
 from app.domain import Direction
@@ -42,7 +43,7 @@ def signal_payload(rows, bid):
 
 @pytest.fixture
 def frozen(monkeypatch):
-    for mod in (signals_api, account_api, trades_api):
+    for mod in (signals_api, account_api, trades_api, health_api):
         monkeypatch.setattr(mod, "utcnow", lambda: FIXED_NOW)
 
 
@@ -202,3 +203,17 @@ def test_signal_state_machine_and_expiry():
     assert not can_transition("EXPIRED", "EXECUTED")
     assert is_expired(FIXED_NOW, FIXED_NOW + timedelta(seconds=1))
     assert not is_expired(FIXED_NOW + timedelta(seconds=60), FIXED_NOW)
+
+
+def test_losing_streak_pauses_signals(setup, signer, monkeypatch):
+    from app.services.risk_state_service import apply_trade_result
+
+    force_signal(setup, monkeypatch)
+    with setup.db.session() as s:
+        from app.database import repositories as repo
+
+        for _ in range(3):
+            apply_trade_result(s, repo.PAPER_LOGIN, -5.0, FIXED_NOW, setup.limits.loss_streak)
+    rows, bid = bars_payload()
+    sig = signer.post("/v1/signal", signal_payload(rows, bid)).json()
+    assert sig["action"] == "NO_TRADE" and sig["reason"].startswith("LOSS_STREAK_COOLDOWN")

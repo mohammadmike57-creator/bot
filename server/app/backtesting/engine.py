@@ -36,7 +36,7 @@ from app.news.economic_calendar import EconomicCalendar
 from app.news.news_filter import BlackoutConfig, NewsFilter
 from app.news.news_provider import EconomicEvent
 from app.portfolio.correlation import CorrelationMatrix
-from app.risk.drawdown import EquityRiskState, update_equity_state
+from app.risk.drawdown import EquityRiskState, record_trade_result, update_equity_state
 from app.risk.limits import RiskLimits
 from app.risk.risk_engine import RiskEngine
 from app.sessions.market_hours import market_status
@@ -167,6 +167,9 @@ class BacktestEngine:
                     if ev.closed is not None:
                         balance += ev.closed.profit
                         closed_events.append(ev.closed)
+                        if ev.closed.final:
+                            total = sum(c.profit for c in closed_events if c.ticket == ev.closed.ticket)
+                            record_trade_result(eq_state, total, close_time, cfg.limits.loss_streak)
                 last_close[sym] = (float(row["close"]), float(row["close"]) + spread)
                 if i % cfg.correlation_update_bars == 0:  # refresh the rolling matrix periodically (causal)
                     lo = max(0, i - 250)
@@ -299,9 +302,9 @@ class BacktestEngine:
         proposal = TradeProposal(symbol=sym, direction=sig.direction, entry_price=sig.entry, stop_loss=sig.stop_loss,
                                  take_profit=sig.take_profit_2 or sig.take_profit, take_profit_2=sig.take_profit_2,
                                  strategy=sig.strategy, confidence=confidence, risk_scale=sig.risk_scale)
-        decision = engine.evaluate(proposal, account, positions, self.specs, eq_state)
+        decision = engine.evaluate(proposal, account, positions, self.specs, eq_state, now=now)
         if not decision.approved:
-            return decision.reason.split(":")[0]
+            return decision.reason.split(":")[0].split(" until")[0]
         pending[sym] = _Pending(proposal, decision.volume, decision.risk_money, session.primary.value, regime.value,
                                 confidence, now)
         return "APPROVED"

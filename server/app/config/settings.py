@@ -85,10 +85,18 @@ class Settings(BaseSettings):
     max_strategy_risk: float = 0.02
     max_portfolio_risk: float = 0.03
     max_margin_usage: float = 0.40
-    max_positions: int = 8
-    max_positions_per_symbol: int = 3
+    # Position counts are a secondary limit: open RISK (below) is what really caps exposure.
+    # Trades whose stop is at break-even or better carry zero open risk, which frees budget
+    # for new trades - so the bot can hold many positions while the money at risk stays capped.
+    max_positions: int = 15
+    max_positions_per_symbol: int = 5
     max_correlated_exposure: float = 0.02
     correlation_threshold: float = 0.6
+    # Losing-streak protection: after N losers trade smaller, after M losers pause.
+    loss_streak_reduce_after: int = 2
+    loss_streak_risk_scale: float = 0.5
+    loss_streak_cooldown_after: int = 3
+    loss_streak_cooldown_minutes: int = 120
     risk_multiplier_min: float = 0.75
     risk_multiplier_max: float = 1.25
     # equity growth (equity / initial equity) -> risk multiplier.
@@ -212,6 +220,10 @@ class Settings(BaseSettings):
             raise ValueError("risk multiplier bounds must satisfy 0 < min <= 1 <= max <= 2")
         if self.max_positions < 1:
             raise ValueError("max_positions must be >= 1")
+        if not 0 < self.loss_streak_risk_scale <= 1:
+            raise ValueError("loss_streak_risk_scale must be in (0, 1] - risk is never increased after losses")
+        if self.loss_streak_cooldown_after < 0 or self.loss_streak_reduce_after < 0:
+            raise ValueError("loss streak counts must be >= 0 (0 disables)")
         return self
 
     # ----------------------------------------------------------- derived values

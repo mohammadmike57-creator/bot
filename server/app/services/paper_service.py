@@ -22,6 +22,8 @@ from app.execution.slippage import slippage_points
 from app.execution.trade_management import ManagementParams
 from app.monitoring.alerts import Alert, AlertType, Notifier, Severity
 from app.risk.drawdown import trading_day_for
+from app.risk.limits import RiskLimits
+from app.services.risk_state_service import apply_trade_result, cooldown_alert
 
 PAPER = "PAPER"
 
@@ -182,6 +184,9 @@ class PaperTradingService:
             row.r_multiple = row.realized_profit / row.risk_money if row.risk_money > 0 else None
             day = trading_day_for(now, self.settings.trading_day_timezone, self.settings.trading_day_rollover_hour)
             repo.upsert_performance_day(s, repo.PAPER_LOGIN, PAPER, day, row.realized_profit)
+            policy = RiskLimits.from_settings(self.settings).loss_streak
+            if apply_trade_result(s, repo.PAPER_LOGIN, row.realized_profit, now, policy):
+                self.notifier.notify(cooldown_alert("PAPER", policy.cooldown_minutes))
             r = row.r_multiple or 0.0
             alert = AlertType.TRADE_CLOSED
             severity = Severity.INFO

@@ -260,7 +260,7 @@ class KillSwitchIn(StrictModel):
 
 
 class ResetRiskIn(StrictModel):
-    items: list[Literal["kill_switch", "daily_loss", "drawdown", "safe_mode"]] = Field(min_length=1)
+    items: list[Literal["kill_switch", "daily_loss", "drawdown", "safe_mode", "loss_streak"]] = Field(min_length=1)
     confirm: Literal["RESET"]
     note: str = Field(default="", max_length=255)
 

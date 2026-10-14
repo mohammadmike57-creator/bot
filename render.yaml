@@ -59,7 +59,7 @@ services:
       - key: MAX_PORTFOLIO_RISK
         value: "0.03"
       - key: MAX_POSITIONS
-        value: "8"
+        value: "15"
     disk:                    # persistent storage for trained model artifacts
       name: models
       mountPath: /var/data

@@ -32,6 +32,7 @@ from app.execution.execution_state import SignalStatus
 from app.execution.order_validation import validate_order
 from app.monitoring.logger import decision_line, get_logger
 from app.portfolio.portfolio_manager import position_from_record, spec_from_record
+from app.risk.drawdown import in_cooldown
 from app.services.container import Container
 from app.sessions.market_hours import market_status
 from app.sessions.timezone import ensure_utc
@@ -189,6 +190,9 @@ class SignalService:
             return no("MAX_DRAWDOWN_REACHED")
         if equity_state.daily_loss_locked:
             return no("MAX_DAILY_LOSS_REACHED")
+        d.add(loss_streak=equity_state.consecutive_losses)
+        if in_cooldown(equity_state, now):
+            return no(f"LOSS_STREAK_COOLDOWN until {equity_state.cooldown_until:%H:%M} UTC")
 
         # 6. portfolio pre-check ------------------------------------------------
         own = [p for p in positions if p.own]
@@ -244,7 +248,7 @@ class SignalService:
             strategy=sig.strategy, confidence=confidence,
             risk_scale=sig.risk_scale * c.allocation.scale_for(logical, sig.strategy),
         )
-        rd = c.risk_engine.evaluate(proposal, account, positions, specs, equity_state, controls.flags())
+        rd = c.risk_engine.evaluate(proposal, account, positions, specs, equity_state, controls.flags(), now)
         d.add(**rd.log_fields())
         if not rd.approved:
             return no(rd.reason)

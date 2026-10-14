@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from app.config.settings import Settings
+from app.risk.drawdown import LossStreakPolicy
 
 
 @dataclass(frozen=True)
@@ -16,14 +17,15 @@ class RiskLimits:
     max_strategy_risk: float = 0.02
     max_portfolio_risk: float = 0.03
     max_margin_usage: float = 0.40
-    max_positions: int = 8
-    max_positions_per_symbol: int = 3
+    max_positions: int = 15
+    max_positions_per_symbol: int = 5
     max_correlated_exposure: float = 0.02
     correlation_threshold: float = 0.6
     risk_multiplier_min: float = 0.75
     risk_multiplier_max: float = 1.25
     min_reward_risk: float = 1.0
     commission_per_lot: float = 0.0
+    loss_streak: LossStreakPolicy = LossStreakPolicy()
 
     @classmethod
     def from_settings(cls, s: Settings) -> RiskLimits:
@@ -42,4 +44,10 @@ class RiskLimits:
             risk_multiplier_min=s.risk_multiplier_min,
             risk_multiplier_max=s.risk_multiplier_max,
             commission_per_lot=s.paper_commission_per_lot,
+            loss_streak=LossStreakPolicy(
+                reduce_after=s.loss_streak_reduce_after,
+                reduced_scale=s.loss_streak_risk_scale,
+                cooldown_after=s.loss_streak_cooldown_after,
+                cooldown_minutes=s.loss_streak_cooldown_minutes,
+            ),
         )

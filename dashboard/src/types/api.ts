@@ -11,6 +11,8 @@ export interface AccountSummary {
   drawdown: number;
   daily_loss_locked: boolean;
   drawdown_locked: boolean;
+  consecutive_losses: number;
+  cooldown_until: string | null;
 }
 
 export interface Controls {
