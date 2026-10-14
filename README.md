@@ -11,6 +11,9 @@ A risk-first, multi-asset trading platform for a **MetaTrader 5 hedging account*
 > This software does not promise profit. Passing tests and compiling are not evidence of an edge.
 > Validate out-of-sample and on a demo account first (see [the live checklist](docs/live-checklist.md)).
 
+**New here? Start with the illustrated step-by-step guide: [docs/setup-guide.html](docs/setup-guide.html)**
+(open it in a browser; it covers Render, MT5 and how the bot limits losses, with screenshots).
+
 ## How it fits together
 
 ```
@@ -85,7 +88,7 @@ with `InpSymbols` set to **your broker's exact symbol names**. Step-by-step: [do
 | `server/app/execution` | trade management (BE/trailing/partials), simulator, order validation, slippage, lifecycle |
 | `server/app/backtesting`, `optimization` | engine, metrics, costs, walk-forward, optimiser, robustness scoring |
 | `server/alembic` | database migrations |
-| `server/tests` | 187 automated tests |
+| `server/tests` | 195 automated tests |
 | `mt5_ea/` | `PRO_MAX_EA.mq5`, `Include/*.mqh`, `Scripts/ExportHistory.mq5` |
 | `dashboard/` | React + Vite + TypeScript dashboard |
 | `scripts/` | `backtest.py`, `validate.py`, `optimize.py`, `train_models.py`, `smoke_test.py` |
